@@ -59,7 +59,7 @@ class Separator():
         return full_audio, vocal_audio, bgm_audio
 
 
-def pre_data(Weigths_Path,dm_model_path,dm_config_path,save_dir,prompt_audio_path,auto_prompt_audio_type):
+def pre_data(Weigths_Path,dm_model_path,dm_config_path,save_dir,prompt_audio_path,auto_prompt_audio_type,gen_type):
     torch.backends.cudnn.enabled = False
     curent_dir = os.path.join(folder_paths.base_path,"custom_nodes/ComfyUI_SongGeneration/SongGeneration")
     RESOLVERS = {
@@ -78,6 +78,9 @@ def pre_data(Weigths_Path,dm_model_path,dm_config_path,save_dir,prompt_audio_pat
     
     cfg = OmegaConf.load(cfg_path)
     cfg.mode = 'inference'
+
+    cfg.gen_type=gen_type
+
     cfg.vae_config=f"{Weigths_Path}/vae/stable_audio_1920_vae.json"
     cfg.vae_model=f"{Weigths_Path}/vae/autoencoder_music_1320k.ckpt"
 
@@ -132,7 +135,8 @@ def infer_stage2(item,cfg,Weigths_Path,max_duration,lyric,descriptions,cfg_coef 
     model.set_generation_params(duration=max_duration, extend_stride=5, temperature=temp, cfg_coef=cfg_coef,
                                 top_k=top_k, top_p=top_p, record_tokens=record_tokens, record_window=record_window)
     
-    items=inference_lowram_step2(model,lyric,descriptions,item_copy)
+    items=inference_lowram_step2(model,lyric,descriptions,item_copy,cfg.gen_type)
+    print(cfg.gen_type)
     model=None
     torch.cuda.empty_cache()
    
@@ -140,7 +144,7 @@ def infer_stage2(item,cfg,Weigths_Path,max_duration,lyric,descriptions,cfg_coef 
 
 
 
-def inference_lowram_step2(model,lyric,descriptions,item):
+def inference_lowram_step2(model,lyric,descriptions,item,gen_type):
     #print(item)
     pmt_wav = item['pmt_wav']
     vocal_wav = item['vocal_wav']
@@ -156,7 +160,7 @@ def inference_lowram_step2(model,lyric,descriptions,item):
         'melody_is_wav': melody_is_wav,
     }
     with torch.autocast(device_type="cuda", dtype=torch.float16):
-        tokens = model.generate(**generate_inp, return_tokens=True)
+        tokens = model.generate(**generate_inp, return_tokens=True,gen_type=gen_type)
     item['tokens'] = tokens
     
     return item
@@ -176,12 +180,12 @@ def inference_lowram_final(cfg,max_duration,item,save_dir):
    
     with torch.no_grad():
         if 'raw_pmt_wav' in item:   
-            wav_seperate = model.generate_audio(item['tokens'], item['raw_pmt_wav'], item['raw_vocal_wav'], item['raw_bgm_wav'], chunked=True)
+            wav_seperate = model.generate_audio(item['tokens'], item['raw_pmt_wav'], item['raw_vocal_wav'], item['raw_bgm_wav'], chunked=True,gen_type=cfg.gen_type)
             item['raw_pmt_wav']=None
             item['raw_vocal_wav']=None
             item['raw_bgm_wav']=None
         else:
-            wav_seperate = model.generate_audio(item['tokens'], chunked=True)
+            wav_seperate = model.generate_audio(item['tokens'], chunked=True,gen_type=cfg.gen_type)
     #torchaudio.save(item['wav_path'], wav_seperate[0].cpu().float(), cfg.sample_rate)
     torchaudio.save(target_wav_name, wav_seperate[0].cpu().float(), cfg.sample_rate)
     item['tokens']=None
