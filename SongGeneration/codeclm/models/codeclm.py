@@ -281,10 +281,12 @@ class CodecLM:
             gen_tokens_bgm = gen_tokens[:, [2], :]
             if gen_type == "bgm":
                 gen_tokens_vocal = torch.full_like(gen_tokens_vocal, 3142)
-                vocal_prompt = None
+                if vocal_prompt is not None:
+                    vocal_prompt = torch.zeros_like(vocal_prompt)
             elif gen_type == "vocal":
                 gen_tokens_bgm = torch.full_like(gen_tokens_bgm, 9670)
-                bgm_prompt = None
+                if bgm_prompt is not None:
+                    bgm_prompt = torch.zeros_like(bgm_prompt)
             # gen_audio_song = self.audiotokenizer.decode(gen_tokens_song, prompt)
             gen_audio_seperate = self.seperate_tokenizer.decode([gen_tokens_vocal, gen_tokens_bgm], vocal_prompt, bgm_prompt, chunked=chunked)
             return gen_audio_seperate
