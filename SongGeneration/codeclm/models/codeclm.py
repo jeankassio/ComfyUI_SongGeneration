@@ -107,7 +107,7 @@ class CodecLM:
                  vocal_wavs: torch.Tensor = None,
                  bgm_wavs: torch.Tensor = None,
                  return_tokens: bool = False,
-                 gen_type: str = "left blank",
+                 gen_type: str = "mixed",
                  ) -> tp.Union[torch.Tensor, tp.Tuple[torch.Tensor, torch.Tensor]]:
         """Generate samples conditioned on text and melody.
 
@@ -257,6 +257,7 @@ class CodecLM:
                 # codebook pattern used, but with delay it is almost accurate.
                 self._progress_callback(generated_tokens, total_gen_len)
             else:
+                
                 print(f'{generated_tokens: 6d} / {total_gen_len: 6d}', end='\r')
 
         if self.duration <= self.max_duration:
@@ -272,23 +273,27 @@ class CodecLM:
         return gen_tokens
 
     @torch.no_grad()
-    def generate_audio(self, gen_tokens: torch.Tensor, prompt=None, vocal_prompt=None, bgm_prompt=None, chunked=False,gen_type="left blank"):
+    def generate_audio(self, gen_tokens: torch.Tensor, prompt=None, vocal_prompt=None, bgm_prompt=None, chunked=False,chunk_size=128,gen_type="mixed"):
         """Generate Audio from tokens"""
         assert gen_tokens.dim() == 3
         if self.seperate_tokenizer is not None:
-            gen_tokens_song = gen_tokens[:, [0], :]
+            #gen_tokens_song = gen_tokens[:, [0], :]
             gen_tokens_vocal = gen_tokens[:, [1], :]
             gen_tokens_bgm = gen_tokens[:, [2], :]
+        
             if gen_type == "bgm":
-                gen_tokens_vocal = torch.full_like(gen_tokens_vocal, 3142)
-                if vocal_prompt is not None:
+                print(f"output {gen_type} ")
+                gen_tokens_vocal = torch.full_like(gen_tokens_vocal, 3142)#3142
+                if isinstance(vocal_prompt, torch.Tensor):
                     vocal_prompt = torch.zeros_like(vocal_prompt)
             elif gen_type == "vocal":
-                gen_tokens_bgm = torch.full_like(gen_tokens_bgm, 9670)
-                if bgm_prompt is not None:
+                print(f"output {gen_type} ")
+                #gen_tokens_bgm = torch.full_like(gen_tokens_bgm, 9670)#9670
+                if isinstance(bgm_prompt, torch.Tensor):
                     bgm_prompt = torch.zeros_like(bgm_prompt)
-            # gen_audio_song = self.audiotokenizer.decode(gen_tokens_song, prompt)
-            gen_audio_seperate = self.seperate_tokenizer.decode([gen_tokens_vocal, gen_tokens_bgm], vocal_prompt, bgm_prompt, chunked=chunked)
+            else:
+                print(f"output {gen_type} ")
+            gen_audio_seperate = self.seperate_tokenizer.decode([gen_tokens_vocal, gen_tokens_bgm], vocal_prompt, bgm_prompt, chunked=chunked, chunk_size=chunk_size)
             return gen_audio_seperate
         else:
             gen_audio = self.audiotokenizer.decode(gen_tokens, prompt)

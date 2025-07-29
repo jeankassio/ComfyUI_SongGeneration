@@ -32,8 +32,8 @@ class HubertModelWithFinalProj(HubertModel):
         # The final projection layer is only used for backward compatibility.
         # Following https://github.com/auspicious3000/contentvec/issues/6
         # Remove this layer is necessary to achieve the desired outcome.
-        print("hidden_size:",config.hidden_size)
-        print("classifier_proj_size:",config.classifier_proj_size)
+        #print("hidden_size:",config.hidden_size) #768
+        #print("classifier_proj_size:",config.classifier_proj_size) #256
         self.final_proj = nn.Linear(config.hidden_size, config.classifier_proj_size)
 
 
@@ -41,7 +41,7 @@ class SampleProcessor(torch.nn.Module):
     def project_sample(self, x: torch.Tensor):
         """Project the original sample to the 'space' where the diffusion will happen."""
         """Project back from diffusion space to the actual sample space."""
-        return z
+        return x
 
 class Feature1DProcessor(SampleProcessor):
     def __init__(self, dim: int = 100, power_std = 1., \
@@ -323,7 +323,7 @@ class PromptCondAudioDiffusion(nn.Module):
         self.set_from = "random"
         self.cfm_wrapper = BASECFM(unet, mlp,self.ssl_layer)
         self.mask_emb = torch.nn.Embedding(3, 48)
-        print("Transformer initialized from pretrain.")
+        #print("Transformer initialized from pretrain.")
         torch.cuda.empty_cache()
         # self.unet.set_attn_processor(AttnProcessor2_0())
         # self.unet.set_use_memory_efficient_attention_xformers(True)
@@ -624,7 +624,7 @@ class PromptCondAudioDiffusion(nn.Module):
         quantized_bestrq_emb,_,_=self.rvq_bestrq_emb.from_codes(codes_bestrq_emb)
         # quantized_bestrq_emb = torch.nn.functional.interpolate(quantized_bestrq_emb, size=(int(quantized_bestrq_emb.shape[-1]/999*937),), mode='linear', align_corners=True)
         quantized_bestrq_emb = quantized_bestrq_emb.permute(0,2,1).contiguous()
-        print("quantized_bestrq_emb.shape:",quantized_bestrq_emb.shape)
+        #print("quantized_bestrq_emb.shape:",quantized_bestrq_emb.shape)
         # quantized_bestrq_emb = torch.nn.functional.interpolate(quantized_bestrq_emb, size=(int(quantized_bestrq_emb.shape[-1]/999*937),), mode='linear', align_corners=True)
 
 

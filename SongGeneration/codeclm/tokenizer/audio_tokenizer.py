@@ -90,11 +90,11 @@ class AudioTokenizer(ABC, nn.Module):
         model: AudioTokenizer
         if name.split('_')[0] == 'Flow1dVAESeparate':
             model_type = name.split('_', 1)[1]
-            logger.info("Getting pretrained compression model from semantic model %s", model_type)
+            #logger.info("Getting pretrained compression model from semantic model %s", model_type)
             model = Flow1dVAESeparate(model_type, vae_config, vae_model)
         elif name.split('_')[0] == 'Flow1dVAE1rvq':
             model_type = name.split('_', 1)[1]
-            logger.info("Getting pretrained compression model from semantic model %s", model_type)
+            #logger.info("Getting pretrained compression model from semantic model %s", model_type)
             model = Flow1dVAE1rvq(model_type, vae_config, vae_model)
         else:
             raise NotImplementedError("{} is not implemented in models/audio_tokenizer.py".format(
@@ -114,7 +114,7 @@ class Flow1dVAE1rvq(AudioTokenizer):
         from .Flow1dVAE.generate_1rvq import Tango
         model_path = model_type
         self.model = Tango(model_path=model_path, vae_config=vae_config, vae_model=vae_model, device='cuda')
-        print ("Successfully loaded checkpoint from:", model_path)
+        #print ("Successfully loaded checkpoint from:", model_path)
 
             
         self.n_quantizers = 1
@@ -189,7 +189,7 @@ class Flow1dVAESeparate(AudioTokenizer):
         from .Flow1dVAE.generate_septoken import Tango
         model_path = model_type
         self.model = Tango(model_path=model_path, vae_config=vae_config, vae_model=vae_model, device='cuda')
-        print ("Successfully loaded checkpoint from:", model_path)
+        #print ("Successfully loaded checkpoint from:", model_path)
 
             
         self.n_quantizers = 1
@@ -208,9 +208,9 @@ class Flow1dVAESeparate(AudioTokenizer):
         return codes_vocal, codes_bgm
     
     @torch.no_grad()    
-    def decode(self, codes: torch.Tensor, prompt_vocal = None, prompt_bgm = None,chunked=False):
+    def decode(self, codes: torch.Tensor, prompt_vocal = None, prompt_bgm = None,chunked=False,chunk_size=128):
         wav = self.model.code2sound(codes, prompt_vocal=prompt_vocal, prompt_bgm=prompt_bgm, guidance_scale=1.5, 
-                                    num_steps=50, disable_progress=False,chunked=chunked) # [B,N,T] -> [B,T]
+                                    num_steps=50, disable_progress=False,chunked=chunked,chunk_size=chunk_size) # [B,N,T] -> [B,T]
         return wav[None]
 
     

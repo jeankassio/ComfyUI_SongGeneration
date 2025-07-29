@@ -90,39 +90,39 @@ class MusicFM25Hz(nn.Module):
         self.use_rvq_target = use_rvq_target
         
         seed = 142
-        if use_rvq_target:
-            try:
-                from .rvq_musicfm import ResidualVectorQuantize
+        # if use_rvq_target:
+        #     try:
+        #         from .rvq_musicfm import ResidualVectorQuantize
                 
-            except:
-                import sys, os
-                sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-                from rvq_musicfm import ResidualVectorQuantize
+        #     except:
+        #         import sys, os
+        #         sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+        #         from rvq_musicfm import ResidualVectorQuantize
     
-            self.rvq = ResidualVectorQuantize(
-                input_dim = 128*4, 
-                n_codebooks = 8, 
-                codebook_size = 1024, 
-                codebook_dim = 16, 
-                quantizer_dropout = 0.0,
-                )
-            import os
-            if rvq_ckpt_path is not None and os.path.exists(rvq_ckpt_path):
-                state_dict = torch.load(rvq_ckpt_path, map_location="cpu")
-                self.rvq.load_state_dict(state_dict)
-            else:
-                print(f'Checkpoint for rvq `{rvq_ckpt_path}` not found. Using random initialization.')
+        #     self.rvq = ResidualVectorQuantize(
+        #         input_dim = 128*4, 
+        #         n_codebooks = 8, 
+        #         codebook_size = 1024, 
+        #         codebook_dim = 16, 
+        #         quantizer_dropout = 0.0,
+        #         )
+        #     import os
+        #     if rvq_ckpt_path is not None and os.path.exists(rvq_ckpt_path):
+        #         state_dict = torch.load(rvq_ckpt_path, map_location="cpu")
+        #         self.rvq.load_state_dict(state_dict)
+        #     else:
+        #         print(f'Checkpoint for rvq `{rvq_ckpt_path}` not found. Using random initialization.')
 
-        else:
-            for feature in self.features:
-                for i in range(num_codebooks):
-                    setattr(
-                        self,
-                        f"quantizer_{feature}", # _{i}
-                        RandomProjectionQuantizer(
-                            n_mels * 4, codebook_dim, codebook_size, seed=seed + i
-                        ),
-                    )
+        # else:
+        #     for feature in self.features:
+        #         for i in range(num_codebooks):
+        #             setattr(
+        #                 self,
+        #                 f"quantizer_{feature}", # _{i}
+        #                 RandomProjectionQuantizer(
+        #                     n_mels * 4, codebook_dim, codebook_size, seed=seed + i
+        #                 ),
+        #             )
 
         # two residual convolution layers + one projection layer
         self.conv = Conv2dSubsampling(
@@ -213,7 +213,7 @@ class MusicFM25Hz(nn.Module):
             if precision == 16:
                 out[key] = out[key].half()
         return out
-
+        
     def encoder(self, x):
         """2-layer conv + w2v-conformer"""
         x = self.conv(x) # [3, 128, 3000] -> [3, 750, 1024]
@@ -247,15 +247,17 @@ class MusicFM25Hz(nn.Module):
     @torch.no_grad()
     def tokenize(self, x):
         out = {}
-        for key in x.keys():
-            if self.use_rvq_target:
-                self.rvq.eval()
-                quantized_prompt_embeds, codes, _, commitment_loss, codebook_loss, rvq_usage = self.rvq(x[key].permute((0, 2, 1)))
-                out[key] = torch.cat([codes[:, idx, :] for idx in range(int(self.codebook_size//1024))], dim=-1)
-            else:
-                layer = getattr(self, "quantizer_%s" % key)
-                out[key] = layer(x[key])
-        return out
+        # for key in x.keys():
+        #     if self.use_rvq_target:
+        #         self.rvq.eval()
+        #         quantized_prompt_embeds, codes, _, commitment_loss, codebook_loss, rvq_usage = self.rvq(x[key].permute((0, 2, 1)))
+        #         out[key] = torch.cat([codes[:, idx, :] for idx in range(int(self.codebook_size//1024))], dim=-1)
+        #     else:
+        #         layer = getattr(self, "quantizer_%s" % key)
+        #         out[key] = layer(x[key])
+        # return out
+        raise NotImplementedError("tokenize is not implemented")
+
 
     def get_targets(self, x):
         x = self.preprocessing(x, features=self.features) # -> {'melspec_2048': Tensor{Size([3, 128, 3000]) cuda:0 f32}}

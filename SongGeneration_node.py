@@ -37,7 +37,7 @@ class SongGeneration_Stage1:
             "required": {
                 "demucs_pt":  (["none"] + [i for i in folder_paths.get_filename_list("SongGeneration") if i.endswith(".pth")],),
                 "auto_prompt_audio_type": (auto_prompt_type,),  
-                "gen_type": (["left blank","bgm","vocal",],),         
+                 
 
             },
              "optional": {
@@ -50,7 +50,7 @@ class SongGeneration_Stage1:
     FUNCTION = "loader_main"
     CATEGORY = "SongGeneration"
 
-    def loader_main(self, demucs_pt,auto_prompt_audio_type,gen_type,**kwargs):
+    def loader_main(self, demucs_pt,auto_prompt_audio_type,**kwargs):
         audio=kwargs.get("audio", None)
         if audio is not None:
             prompt_audio_path = os.path.join(folder_paths.get_input_directory(), f"audio_{time.strftime('%m%d%H%S')}_temp.wav")
@@ -72,7 +72,7 @@ class SongGeneration_Stage1:
         dm_config_path=os.path.join(current_node_path, "SongGeneration/third_party/demucs/ckpt/htdemucs.yaml")
         Weigths_Path=os.path.join(SongGeneration_Weigths_Path, "ckpt")
         
-        item,max_duration,cfg=pre_data(Weigths_Path,dm_model_path,dm_config_path,folder_paths.get_output_directory(),prompt_audio_path,auto_prompt_audio_type,gen_type)
+        item,max_duration,cfg=pre_data(Weigths_Path,dm_model_path,dm_config_path,folder_paths.get_output_directory(),prompt_audio_path,auto_prompt_audio_type)
        
 
         gc_clear()
@@ -97,6 +97,7 @@ class SongGeneration_Stage2:
                 "top_p": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 1.0, "step": 0.01}),
                 "record_tokens": ("BOOLEAN", {"default": True}),
                 "record_window": ("INT", {"default": 50, "min": 1, "max": 1000, "step": 1}),
+                    
             },
         }
 
@@ -108,10 +109,11 @@ class SongGeneration_Stage2:
     def loader_main(self, model,lyric,description,cfg_coef,temp,top_k,top_p,record_tokens,record_window):
 
         descriptions=description if model.get("use_descriptions") else None
-
+        
+        
         items=infer_stage2(model.get("item"),model.get("cfg"),model.get("Weigths_Path"),model.get("max_duration"),lyric,descriptions,cfg_coef, temp,top_k,top_p,record_tokens ,record_window )
         gc_clear()
-        return ({"item":items,"cfg":model.get("cfg"),"max_duration":model.get("max_duration"),},)
+        return ({"items":items,"cfg":model.get("cfg"),"max_duration":model.get("max_duration"),},)
 
 
 
@@ -124,6 +126,8 @@ class SongGeneration_Sampler:
         return {
             "required": {
                 "model": ("SongGeneration_DICT",),
+                "gen_type": (["mixed","bgm","vocal",],), 
+                "save_separate": ("BOOLEAN", {"default": True}),
             }
             }
 
@@ -132,9 +136,11 @@ class SongGeneration_Sampler:
     FUNCTION = "sampler_main"
     CATEGORY = "SongGeneration"
 
-    def sampler_main(self, model):
-
-        audio=inference_lowram_final(model.get("cfg"),model.get("max_duration"),model.get("item"),folder_paths.get_output_directory())
+    def sampler_main(self, model,gen_type,save_separate):
+        cfg=model.get("cfg")
+        cfg.gen_type=gen_type
+        print("start inference final")
+        audio=inference_lowram_final(cfg,model.get("max_duration"),model.get("items"),folder_paths.get_output_directory(),save_separate)
 
         gc_clear()
         return (audio,)

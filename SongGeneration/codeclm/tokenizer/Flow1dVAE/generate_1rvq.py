@@ -42,11 +42,11 @@ class Tango:
         else:
             main_weights = torch.load(model_path, map_location=device)
         self.model.load_state_dict(main_weights, strict=False)
-        print ("Successfully loaded checkpoint from:", model_path)
+        #print ("Successfully loaded checkpoint from:", model_path)
         
         self.model.eval()
         self.model.init_device_dtype(torch.device(device), torch.float32)
-        print("scaling factor: ", self.model.normfeat.std)
+        #print("scaling factor: ", self.model.normfeat.std)
         
         # self.scheduler = DDIMScheduler.from_pretrained( \
         #     scheduler_name, subfolder="scheduler")
@@ -107,7 +107,7 @@ class Tango:
         min_samples = int(40 * self.sample_rate)
         # 40秒对应10个token
         output_len = int(orig_length / float(self.sample_rate) * 25) + 1
-        print("output_len: ", output_len)
+        #print("output_len: ", output_len)
 
         while(audios.shape[-1] < min_samples):
             audios = torch.cat([audios, audios], -1)
@@ -205,7 +205,7 @@ class Tango:
                 else:
                     # print("Processing {} to {}".format(sinx/self.sample_rate, (sinx + min_samples)/self.sample_rate))
                     true_latent = latent_list[-1][:,:,-ovlp_frames:].permute(0,2,1)
-                    print("true_latent.shape", true_latent.shape)
+                    #print("true_latent.shape", true_latent.shape)
                     len_add_to_1000 = min_samples - true_latent.shape[-2]
                     # print("len_add_to_1000", len_add_to_1000)
                     # exit()

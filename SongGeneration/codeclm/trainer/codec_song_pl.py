@@ -45,13 +45,13 @@ class CodecLM_PL(pl.LightningModule):
         
         # 2) Build LM
         self.audiolm = builders.get_lm_model(self.cfg)
-        print(self.audiolm)
+        #print(self.audiolm)
         # 3) Load pretrained checkpoint (if any)
         checkpoint = torch.load(ckpt_path, map_location='cpu')
         missing, unexpected = self.load_state_dict(checkpoint, strict=False)
-        print(f'-------------Missing--------------\n{missing}')
-        print(f'-------------Unexpected--------------\n{unexpected}')
-        print("successfully load deepspeed pretrained model {}".format(ckpt_path))
+        # print(f'-------------Missing--------------\n{missing}')
+        # print(f'-------------Unexpected--------------\n{unexpected}')
+        # print("successfully load deepspeed pretrained model {}".format(ckpt_path))
         # 4) Build metrics
         self.val_steps = []
         self.train_slide_acc = []
@@ -70,7 +70,7 @@ class CodecLM_PL(pl.LightningModule):
         ) for _ in range(self.audiolm.code_depth)])
 
         self.epoch = 0
-        print("++++++++++++++++ training <song> +++++++++++++++++")
+        print("++++++++++++++++ infer <song> +++++++++++++++++")
 
     # TODO: move this part to loader
     def generate_mask_and_end_token(self, x, sequence_lengths, end_id=16384):

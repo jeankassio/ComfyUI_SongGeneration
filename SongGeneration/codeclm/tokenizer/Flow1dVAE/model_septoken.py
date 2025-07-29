@@ -32,8 +32,8 @@ class HubertModelWithFinalProj(HubertModel):
         # The final projection layer is only used for backward compatibility.
         # Following https://github.com/auspicious3000/contentvec/issues/6
         # Remove this layer is necessary to achieve the desired outcome.
-        print("hidden_size:",config.hidden_size)
-        print("classifier_proj_size:",config.classifier_proj_size)
+        # print("hidden_size:",config.hidden_size)
+        # print("classifier_proj_size:",config.classifier_proj_size)
         self.final_proj = nn.Linear(config.hidden_size, config.classifier_proj_size)
 
 
@@ -41,7 +41,7 @@ class SampleProcessor(torch.nn.Module):
     def project_sample(self, x: torch.Tensor):
         """Project the original sample to the 'space' where the diffusion will happen."""
         """Project back from diffusion space to the actual sample space."""
-        return z
+        return x
 
 class Feature1DProcessor(SampleProcessor):
     def __init__(self, dim: int = 100, power_std = 1., \
@@ -291,7 +291,7 @@ class PromptCondAudioDiffusion(nn.Module):
         self.set_from = "random"
         self.cfm_wrapper = BASECFM(unet, mlp)
         self.mask_emb = torch.nn.Embedding(3, 24)
-        print("Transformer initialized from pretrain.")
+        #print("Transformer initialized from pretrain.")
         torch.cuda.empty_cache()
 
     def compute_snr(self, timesteps):
@@ -403,6 +403,7 @@ class PromptCondAudioDiffusion(nn.Module):
 
         if(train_ssl):
             self.wav2vec.train()
+            input_audios=None #TODO
             wav2vec_embeds = self.extract_wav2vec_embeds(input_audios)
             self.clap_embd_extractor.train()
             prompt_embeds = self.extract_mert_embeds(input_audios)
@@ -411,12 +412,13 @@ class PromptCondAudioDiffusion(nn.Module):
                 spk_embeds = self.extract_spk_embeds(input_audios).repeat(1,1,prompt_embeds.shape[-1]//2,1)
         else:
             with torch.no_grad():
-                with autocast(enabled=False):
-                    bestrq_emb = self.extract_bestrq_embeds(input_audio_vocal_0,input_audio_vocal_1,layer_vocal)
-                    bestrq_emb_bgm = self.extract_bestrq_embeds(input_audio_bgm_0,input_audio_bgm_1,layer_bgm)
+                #with autocast(enabled=False):
+                with autocast(device_type='cuda', dtype=torch.float16):
+                    bestrq_emb = self.new_extract_embeds(input_audio_vocal_0,input_audio_vocal_1,layer_vocal)
+                    bestrq_emb_bgm = self.new_extract_embeds(input_audio_bgm_0,input_audio_bgm_1,layer_bgm)
                     # mert_emb = self.extract_mert_embeds(input_audios_mert)
                     output_len = bestrq_emb.shape[2]
-                    wav2vec_embeds = self.extract_wav2vec_embeds(input_audios_vocal_wav2vec+input_audios_bgm_wav2vec,output_len)
+                    wav2vec_embeds = self.new_wav2vec_extract(input_audios_vocal_wav2vec+input_audios_bgm_wav2vec,output_len)
 
 
                 bestrq_emb = bestrq_emb.detach()

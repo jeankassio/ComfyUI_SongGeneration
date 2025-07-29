@@ -21,7 +21,7 @@ def load_model(model_dir, checkpoint_dir):
     
     checkpoint_dir=os.path.join(folder_paths.models_dir,"SongGeneration/ckpt/encode-s12k.pt")
     fairseq.utils.import_user_module(model_path)
-    print(checkpoint_dir,model_dir)
+    #print(checkpoint_dir,model_dir)
     #载入模型的checkpoint
     model, cfg, task = load_model_ensemble_and_task([checkpoint_dir], strict=False)
     model = model[0]

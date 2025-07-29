@@ -6,6 +6,7 @@ import copy
 import torch
 import torchaudio
 import numpy as np
+import gc
 from omegaconf import OmegaConf
 from .SongGeneration.codeclm.models import builders
 from .SongGeneration.codeclm.trainer.codec_song_pl import CodecLM_PL
@@ -59,7 +60,7 @@ class Separator():
         return full_audio, vocal_audio, bgm_audio
 
 
-def pre_data(Weigths_Path,dm_model_path,dm_config_path,save_dir,prompt_audio_path,auto_prompt_audio_type,gen_type):
+def pre_data(Weigths_Path,dm_model_path,dm_config_path,save_dir,prompt_audio_path,auto_prompt_audio_type):
     torch.backends.cudnn.enabled = False
     curent_dir = os.path.join(folder_paths.base_path,"custom_nodes/ComfyUI_SongGeneration/SongGeneration")
     RESOLVERS = {
@@ -79,7 +80,7 @@ def pre_data(Weigths_Path,dm_model_path,dm_config_path,save_dir,prompt_audio_pat
     cfg = OmegaConf.load(cfg_path)
     cfg.mode = 'inference'
 
-    cfg.gen_type=gen_type
+
 
     cfg.vae_config=f"{Weigths_Path}/vae/stable_audio_1920_vae.json"
     cfg.vae_model=f"{Weigths_Path}/vae/autoencoder_music_1320k.ckpt"
@@ -89,20 +90,20 @@ def pre_data(Weigths_Path,dm_model_path,dm_config_path,save_dir,prompt_audio_pat
     cfg.conditioners.type_info.QwTextTokenizer.token_path=os.path.join(folder_paths.base_path,"custom_nodes/ComfyUI_SongGeneration/SongGeneration/third_party/Qwen2-7B")
     max_duration = cfg.max_dur
 
-    separator = Separator(dm_model_path, dm_config_path)
     auto_prompt = torch.load(os.path.join(Weigths_Path,'prompt.pt'),weights_only=False)
-
-    audio_tokenizer = builders.get_audio_tokenizer_model(cfg.audio_tokenizer_checkpoint, cfg)
-    if "audio_tokenizer_checkpoint_sep" in cfg.keys():
-        seperate_tokenizer = builders.get_audio_tokenizer_model(cfg.audio_tokenizer_checkpoint_sep, cfg)
-    else:
-        seperate_tokenizer = None
-    audio_tokenizer = audio_tokenizer.eval().cuda()
-    if seperate_tokenizer is not None:
-        seperate_tokenizer = seperate_tokenizer.eval().cuda()
-
     merge_prompt = [x for sublist in auto_prompt.values() for x in sublist]
-    original_item=song_infer_lowram(seperate_tokenizer,separator,audio_tokenizer,merge_prompt,auto_prompt, save_dir,prompt_audio_path,auto_prompt_audio_type)
+
+    if prompt_audio_path is not None:
+        separator = Separator(dm_model_path, dm_config_path)
+        audio_tokenizer = builders.get_audio_tokenizer_model(cfg.audio_tokenizer_checkpoint, cfg)
+        audio_tokenizer = audio_tokenizer.eval().cuda()
+
+    else:
+        audio_tokenizer = None
+        separator = None
+    
+    original_item=song_infer_lowram(cfg,separator,audio_tokenizer,merge_prompt,auto_prompt, save_dir,prompt_audio_path,auto_prompt_audio_type)
+    print("step1 is done.")
     return copy.deepcopy(original_item),max_duration,cfg
 
 
@@ -119,32 +120,46 @@ def infer_stage2(item,cfg,Weigths_Path,max_duration,lyric,descriptions,cfg_coef 
         # 不包含 'tokens' 因为它将在 step2 中生成
     }
     # Define model or load pretrained model
-    model_light = CodecLM_PL(cfg, ckpt_path)
-    model_light = model_light.eval()
-    model_light.audiolm.cfg = cfg
+    # model_light = CodecLM_PL(cfg, ckpt_path)
+    # model_light = model_light.eval()
+    # model_light.audiolm.cfg = cfg
+    # model = CodecLM(name = "tmp",
+    #     lm = model_light.audiolm,
+    #     audiotokenizer = None,
+    #     max_duration = max_duration,
+    #     seperate_tokenizer = None,
+    # )
+    # del model_light
+    audiolm = builders.get_lm_model(cfg)
+    checkpoint = torch.load(ckpt_path, map_location='cpu')
+    audiolm_state_dict = {k.replace('audiolm.', ''): v for k, v in checkpoint.items() if k.startswith('audiolm')}
+    audiolm.load_state_dict(audiolm_state_dict, strict=False)
+    audiolm = audiolm.eval()
+    audiolm = audiolm.cuda().to(torch.float16)
+    del audiolm_state_dict,checkpoint
+    torch.cuda.empty_cache()
     model = CodecLM(name = "tmp",
-        lm = model_light.audiolm,
+        lm = audiolm,
         audiotokenizer = None,
         max_duration = max_duration,
         seperate_tokenizer = None,
     )
-    del model_light
-    torch.cuda.empty_cache()
-    model.lm = model.lm.cuda().to(torch.float16)
     
-    model.set_generation_params(duration=max_duration, extend_stride=5, temperature=temp, cfg_coef=cfg_coef,
-                                top_k=top_k, top_p=top_p, record_tokens=record_tokens, record_window=record_window)
-    
-    items=inference_lowram_step2(model,lyric,descriptions,item_copy,cfg.gen_type)
-    print(cfg.gen_type)
+    model.set_generation_params(duration=max_duration, extend_stride=5, temperature=temp, 
+                                top_k=top_k, top_p=top_p,cfg_coef=cfg_coef, record_tokens=record_tokens, record_window=record_window)
+    print("model loaded,start inference step2")
+    items=inference_lowram_step2(model,lyric,descriptions,item_copy,)
+    audiolm = audiolm.cpu()
+    del audiolm
     model=None
+    gc.collect()
     torch.cuda.empty_cache()
    
     return items
 
 
 
-def inference_lowram_step2(model,lyric,descriptions,item,gen_type):
+def inference_lowram_step2(model,lyric,descriptions,item,):
     #print(item)
     pmt_wav = item['pmt_wav']
     vocal_wav = item['vocal_wav']
@@ -160,14 +175,14 @@ def inference_lowram_step2(model,lyric,descriptions,item,gen_type):
         'melody_is_wav': melody_is_wav,
     }
     with torch.autocast(device_type="cuda", dtype=torch.float16):
-        tokens = model.generate(**generate_inp, return_tokens=True,gen_type=gen_type)
+        tokens = model.generate(**generate_inp, return_tokens=True)
     item['tokens'] = tokens
     
     return item
 
 
 
-def inference_lowram_final(cfg,max_duration,item,save_dir):
+def inference_lowram_final(cfg,max_duration,item,save_dir,save_separate):
     target_wav_name = f"{save_dir}/song_audios{time.strftime('%m%d%H%S')}.flac"
     seperate_tokenizer = builders.get_audio_tokenizer_model(cfg.audio_tokenizer_checkpoint_sep, cfg)
     seperate_tokenizer = seperate_tokenizer.eval().cuda()
@@ -179,72 +194,73 @@ def inference_lowram_final(cfg,max_duration,item,save_dir):
     )
    
     with torch.no_grad():
-        if 'raw_pmt_wav' in item:   
-            wav_seperate = model.generate_audio(item['tokens'], item['raw_pmt_wav'], item['raw_vocal_wav'], item['raw_bgm_wav'], chunked=True,gen_type=cfg.gen_type)
-            item['raw_pmt_wav']=None
-            item['raw_vocal_wav']=None
-            item['raw_bgm_wav']=None
+        if item["melody_is_wav"]:  
+            if save_separate :
+                wav_seperate = model.generate_audio(item['tokens'], item['pmt_wav'], item['vocal_wav'], item['bgm_wav'], chunked=True, gen_type='mixed')
+                wav_vocal = model.generate_audio(item['tokens'], item['pmt_wav'], item['vocal_wav'], item['bgm_wav'], chunked=True, gen_type='vocal')
+                wav_bgm = model.generate_audio(item['tokens'], item['pmt_wav'], item['vocal_wav'], item['bgm_wav'], chunked=True, gen_type='bgm')
+            else:
+                if cfg.gen_type == 'mixed':
+                    wav_seperate=model.generate_audio(item['tokens'], item['pmt_wav'], item['pmt_wav'], item['bgm_wav'], chunked=True, gen_type='mixed')
+                else:
+                    wav_seperate = model.generate_audio(item['tokens'],chunked=True, gen_type=cfg.sample_rate)
         else:
-            wav_seperate = model.generate_audio(item['tokens'], chunked=True,gen_type=cfg.gen_type)
-    #torchaudio.save(item['wav_path'], wav_seperate[0].cpu().float(), cfg.sample_rate)
+            if save_separate :
+                wav_vocal = model.generate_audio(item['tokens'], chunked=True, gen_type='vocal')
+                wav_bgm = model.generate_audio(item['tokens'], chunked=True, gen_type='bgm')
+                wav_seperate = model.generate_audio(item['tokens'], chunked=True, gen_type='mixed')
+            else:
+                wav_seperate = model.generate_audio(item['tokens'], chunked=True, gen_type=cfg.gen_type)
+   
+    if save_separate :
+        torchaudio.save(f"{save_dir}/vocal_audios{time.strftime('%m%d%H%S')}.flac", wav_vocal[0].cpu().float(), cfg.sample_rate)
+        torchaudio.save(f"{save_dir}/bgm_audios{time.strftime('%m%d%H%S')}.flac", wav_bgm[0].cpu().float(), cfg.sample_rate)
+
     torchaudio.save(target_wav_name, wav_seperate[0].cpu().float(), cfg.sample_rate)
-    item['tokens']=None
-    item['pmt_wav']=None
-    item['vocal_wav']=None
-    item['bgm_wav']=None
-    item['melody_is_wav']=None
+    # item['tokens']=None
+    # item['pmt_wav']=None
+    # item['vocal_wav']=None
+    # item['bgm_wav']=None
+    # item['melody_is_wav']=None
 
     return {"waveform": wav_seperate[0].cpu().float().unsqueeze(0), "sample_rate": cfg.sample_rate}
 
 
 
-def song_infer_lowram(seperate_tokenizer,separator,audio_tokenizer,merge_prompt,auto_prompt, save_dir,prompt_audio_path,auto_prompt_audio_type): #item dict
+def song_infer_lowram(cfg,separator,audio_tokenizer,merge_prompt,auto_prompt, save_dir,prompt_audio_path,auto_prompt_audio_type): #item dict
     item = {}
     target_wav_name = f"{save_dir}/song_audios{time.strftime('%m%d%H%S')}.flac"
+    melody_is_wav = False
     if prompt_audio_path:
-        # assert os.path.exists(item['prompt_audio_path']), f"prompt_audio_path {item['prompt_audio_path']} not found"
-        # assert 'auto_prompt_audio_type' not in item, f"auto_prompt_audio_type and prompt_audio_path cannot be used together"
+
         pmt_wav, vocal_wav, bgm_wav = separator.run(prompt_audio_path)
-        item['raw_pmt_wav'] = pmt_wav
-        item['raw_vocal_wav'] = vocal_wav
-        item['raw_bgm_wav'] = bgm_wav
-        if pmt_wav.dim() == 2:
-            pmt_wav = pmt_wav[None]
-        if pmt_wav.dim() != 3:
-            raise ValueError("Melody wavs should have a shape [B, C, T].")
-        pmt_wav = list(pmt_wav)
-        if vocal_wav.dim() == 2:
-            vocal_wav = vocal_wav[None]
-        if vocal_wav.dim() != 3:
-            raise ValueError("Vocal wavs should have a shape [B, C, T].")
-        vocal_wav = list(vocal_wav)
-        if bgm_wav.dim() == 2:
-            bgm_wav = bgm_wav[None]
-        if bgm_wav.dim() != 3:
-            raise ValueError("BGM wavs should have a shape [B, C, T].")
-        bgm_wav = list(bgm_wav)
-        if type(pmt_wav) == list:
-            pmt_wav = torch.stack(pmt_wav, dim=0)
-        if type(vocal_wav) == list:
-            vocal_wav = torch.stack(vocal_wav, dim=0)
-        if type(bgm_wav) == list:
-            bgm_wav = torch.stack(bgm_wav, dim=0)
         pmt_wav = pmt_wav.cuda()
         vocal_wav = vocal_wav.cuda()
         bgm_wav = bgm_wav.cuda()
-        pmt_wav, _ = audio_tokenizer.encode(pmt_wav)
-        vocal_wav, bgm_wav = seperate_tokenizer.encode(vocal_wav, bgm_wav)
-        melody_is_wav = False
+        with torch.no_grad():
+            pmt_wav, _ = audio_tokenizer.encode(pmt_wav)
+        audio_tokenizer=None
+        separator=None
+        gc.collect()
+        if "audio_tokenizer_checkpoint_sep" in cfg.keys():
+            seperate_tokenizer = builders.get_audio_tokenizer_model(cfg.audio_tokenizer_checkpoint_sep, cfg)
+        else:
+            raise ValueError("No audio tokenizer checkpoint found")
+        seperate_tokenizer = seperate_tokenizer.eval().cuda()
+        with torch.no_grad():
+            vocal_wav, bgm_wav = seperate_tokenizer.encode(vocal_wav, bgm_wav)
+        del seperate_tokenizer
+        gc.collect()
+        
     elif auto_prompt_audio_type:
         #assert item["auto_prompt_audio_type"] in auto_prompt_type, f"auto_prompt_audio_type {item['auto_prompt_audio_type']} not found"
-        if auto_prompt_audio_type == "Auto": 
+        if auto_prompt_audio_type == 'Auto': 
             prompt_token = merge_prompt[np.random.randint(0, len(merge_prompt))]
         else:
             prompt_token = auto_prompt[auto_prompt_audio_type][np.random.randint(0, len(auto_prompt[auto_prompt_audio_type]))]
         pmt_wav = prompt_token[:,[0],:]
         vocal_wav = prompt_token[:,[1],:]
         bgm_wav = prompt_token[:,[2],:]
-        melody_is_wav = False
     else:
         pmt_wav = None
         vocal_wav = None
@@ -257,10 +273,6 @@ def song_infer_lowram(seperate_tokenizer,separator,audio_tokenizer,merge_prompt,
     item["idx"] = 0
     item["wav_path"] = target_wav_name
     
-
-    del audio_tokenizer
-    del seperate_tokenizer
-    del separator
 
     return item
 

@@ -173,7 +173,7 @@ class Tango:
         return codes_vocal, codes_bgm
 
     @torch.no_grad()
-    def code2sound(self, codes, prompt_vocal=None, prompt_bgm=None, duration=40, guidance_scale=1.5, num_steps=20, disable_progress=False, chunked=False):
+    def code2sound(self, codes, prompt_vocal=None, prompt_bgm=None, duration=40, guidance_scale=1.5, num_steps=20, disable_progress=False, chunked=False,chunk_size=128):
         codes_vocal,codes_bgm = codes
         codes_vocal = codes_vocal.to(self.device)
         codes_bgm = codes_bgm.to(self.device)
@@ -188,7 +188,7 @@ class Tango:
         first_latent_codes_length = 0
 
 
-        if (isinstance(prompt_vocal, torch.Tensor)) and (isinstance(prompt_bgm, torch.Tensor)):
+        if isinstance(prompt_vocal, torch.Tensor) and isinstance(prompt_bgm, torch.Tensor):
             # prepare prompt
             prompt_vocal = prompt_vocal.to(self.device)
             prompt_bgm = prompt_bgm.to(self.device)
@@ -213,7 +213,11 @@ class Tango:
                 prompt_vocal = prompt_vocal[:,int(20*self.sample_rate):int(30*self.sample_rate)] # limit max length to 10.24
                 prompt_bgm = prompt_bgm[:,int(20*self.sample_rate):int(30*self.sample_rate)] # limit max length to 10.24
             
+            
             true_latent = self.vae.encode_audio(prompt_vocal+prompt_bgm).permute(0,2,1)
+            # true_latent_vocal = self.vae.encode_audio(prompt_vocal).permute(0,2,1)  #TODO
+            # true_latent_bgm = self.vae.encode_audio(prompt_bgm).permute(0,2,1)
+            # true_latent = torch.cat([true_latent_vocal, true_latent_bgm], dim=-1)
             
             first_latent[:,0:true_latent.shape[1],:] = true_latent
             first_latent_length = true_latent.shape[1]
@@ -272,7 +276,7 @@ class Tango:
             output = None
             for i in range(len(latent_list)):
                 latent = latent_list[i]
-                cur_output = self.vae.decode_audio(latent,chunked=chunked)[0].detach().cpu()
+                cur_output = self.vae.decode_audio(latent,chunked=chunked,chunk_size=chunk_size)[0].detach().cpu()
 
                 if output is None:
                     output = cur_output
