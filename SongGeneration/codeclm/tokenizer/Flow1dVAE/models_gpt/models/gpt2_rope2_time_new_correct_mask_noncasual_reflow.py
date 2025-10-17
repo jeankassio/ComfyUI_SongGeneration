@@ -37,7 +37,11 @@ from transformers.modeling_outputs import (
     SequenceClassifierOutputWithPast,
     TokenClassifierOutput,
 )
-from transformers.modeling_utils import PreTrainedModel, SequenceSummary
+from transformers.modeling_utils import PreTrainedModel
+try: 
+    from transformers.models.gpt2.modeling_gpt2 import GPT2SequenceSummary as SequenceSummary
+except:
+    from transformers.modeling_utils import SequenceSummary
 from transformers.pytorch_utils import Conv1D, find_pruneable_heads_and_indices, prune_conv1d_layer
 from transformers.utils import (
     ModelOutput,
