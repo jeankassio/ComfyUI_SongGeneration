@@ -617,8 +617,6 @@ class PromptCondAudioDiffusion(nn.Module):
         if(scenario=='other_seg'):
             latent_masks[:,0:incontext_length] = 1
 
-        
-
         quantized_bestrq_emb = (latent_masks > 0.5).unsqueeze(-1) * quantized_bestrq_emb \
             + (latent_masks < 0.5).unsqueeze(-1) * self.zero_cond_embedding1.reshape(1,1,1024)
         quantized_bestrq_emb_bgm = (latent_masks > 0.5).unsqueeze(-1) * quantized_bestrq_emb_bgm \

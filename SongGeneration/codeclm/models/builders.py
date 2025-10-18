@@ -21,20 +21,19 @@ from ..modules.conditioners import (
     ConditionFuser,
 )
 
-
-def get_audio_tokenizer_model(checkpoint_path: str, cfg: omegaconf.DictConfig):
+def get_audio_tokenizer_model(checkpoint_path: str,  vae_config,vae_model,mode):
     from ..tokenizer.audio_tokenizer import AudioTokenizer
     """Instantiate a compression model."""
     if checkpoint_path is None:
         return None
     if checkpoint_path.startswith('//pretrained/'):
         name = checkpoint_path.split('/', 3)[-1]
-        return AudioTokenizer.get_pretrained(name, cfg.vae_config, cfg.vae_model, 'cpu', mode=cfg.mode)
+        return AudioTokenizer.get_pretrained(name, vae_config,vae_model,'cpu', mode=mode)
     elif checkpoint_path == "":
         return None
     else:
         name = checkpoint_path
-        return AudioTokenizer.get_pretrained(name, cfg.vae_config, cfg.vae_model, 'cpu', mode=cfg.mode)
+        return AudioTokenizer.get_pretrained(name, vae_config,vae_model,'cpu', mode=mode)
     
 def get_lm_model(cfg: omegaconf.DictConfig): #-> LMModel:
     """Instantiate a LM."""    

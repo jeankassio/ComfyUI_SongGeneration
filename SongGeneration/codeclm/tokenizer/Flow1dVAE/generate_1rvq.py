@@ -15,15 +15,14 @@ from safetensors.torch import load_file
 class Tango:
     def __init__(self, \
         model_path, \
-        vae_config="",
-        vae_model="",
+        vae_config,
+        vae_model,
         layer_num=6, \
-        device="cuda:0"):
+        device="cuda"):
         
         self.sample_rate = 48000
         scheduler_name = "custom_nodes/ComfyUI_SongGeneration/SongGeneration/codeclm/tokenizer/Flow1dVAE/our_MERT_BESTRQ/mert_fairseq/configs/scheduler/stable_diffusion_2.1_largenoise_sample.json"
         self.device = device
-
         self.vae = get_model(vae_config, vae_model)
         self.vae = self.vae.to(device)
         self.vae=self.vae.eval()
@@ -43,7 +42,7 @@ class Tango:
             main_weights = torch.load(model_path, map_location=device)
         self.model.load_state_dict(main_weights, strict=False)
         #print ("Successfully loaded checkpoint from:", model_path)
-        
+        del main_weights
         self.model.eval()
         self.model.init_device_dtype(torch.device(device), torch.float32)
         #print("scaling factor: ", self.model.normfeat.std)
@@ -91,6 +90,7 @@ class Tango:
     #             saved_samples = saved_samples[:,0:audio.shape[-1]]
     #         output = torch.cat([saved_samples.detach().cpu(),audio[0].detach().cpu()],0)
     #     return output
+
 
     @torch.no_grad()
     @torch.autocast(device_type="cuda", dtype=torch.float32)

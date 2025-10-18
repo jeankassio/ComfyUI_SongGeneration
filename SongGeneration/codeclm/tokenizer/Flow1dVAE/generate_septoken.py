@@ -73,15 +73,14 @@ class Tango:
         vae_model,
         layer_vocal=7,\
         layer_bgm=3,\
-        device="cuda:0"):
+        device="cuda"
+        ):
         
         self.sample_rate = 48000
         scheduler_name = "configs/scheduler/stable_diffusion_2.1_largenoise_sample.json"
         self.device = device
-
         self.vae = get_model(vae_config, vae_model)
-        self.vae = self.vae.to(device)
-        self.vae=self.vae.eval()
+        self.vae=self.vae.to(device).eval()
         self.layer_vocal=layer_vocal
         self.layer_bgm=layer_bgm
 
@@ -99,7 +98,7 @@ class Tango:
             main_weights = torch.load(model_path, map_location=device)
         self.model.load_state_dict(main_weights, strict=False)
         #print ("Successfully loaded checkpoint from:", model_path)
-        
+        del main_weights
         self.model.eval()
         self.model.init_device_dtype(torch.device(device), torch.float32)
         #print("scaling factor: ", self.model.normfeat.std)
@@ -110,7 +109,7 @@ class Tango:
         #     scheduler_name, subfolder="scheduler")
         #print("Successfully loaded inference scheduler from {}".format(scheduler_name))
 
-
+         
     @torch.no_grad()
     @torch.autocast(device_type="cuda", dtype=torch.float32)
     def sound2code(self, orig_vocal, orig_bgm, batch_size=8):

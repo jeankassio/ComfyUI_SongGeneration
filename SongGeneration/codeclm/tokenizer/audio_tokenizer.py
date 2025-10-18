@@ -75,9 +75,9 @@ class AudioTokenizer(ABC, nn.Module):
     @staticmethod
     def get_pretrained(
             name: str, 
-            vae_config: str,
-            vae_model: str,
-            device: tp.Union[torch.device, str] = 'cpu', 
+            vae_config,
+            vae_model,
+            device: tp.Union[torch.device, str] = 'cuda', 
             mode='extract'
             ) -> 'AudioTokenizer':
         """Instantiate a AudioTokenizer model from a given pretrained model.
@@ -91,11 +91,11 @@ class AudioTokenizer(ABC, nn.Module):
         if name.split('_')[0] == 'Flow1dVAESeparate':
             model_type = name.split('_', 1)[1]
             #logger.info("Getting pretrained compression model from semantic model %s", model_type)
-            model = Flow1dVAESeparate(model_type, vae_config, vae_model)
+            model = Flow1dVAESeparate(model_type, vae_config,vae_model)
         elif name.split('_')[0] == 'Flow1dVAE1rvq':
             model_type = name.split('_', 1)[1]
             #logger.info("Getting pretrained compression model from semantic model %s", model_type)
-            model = Flow1dVAE1rvq(model_type, vae_config, vae_model)
+            model = Flow1dVAE1rvq(model_type, vae_config,vae_model)
         else:
             raise NotImplementedError("{} is not implemented in models/audio_tokenizer.py".format(
                 name))
@@ -106,18 +106,20 @@ class Flow1dVAE1rvq(AudioTokenizer):
     def __init__(
         self, 
         model_type: str = "model_2_fixed.safetensors",
-        vae_config: str = "",
-        vae_model: str = "",
+        vae_config:str = "",
+        vae_model:str = "",
         ):
         super().__init__()
 
         from .Flow1dVAE.generate_1rvq import Tango
         model_path = model_type
-        self.model = Tango(model_path=model_path, vae_config=vae_config, vae_model=vae_model, device='cuda')
+        self.model = Tango(model_path=model_path, vae_config=vae_config, vae_model=vae_model,device='cuda')
         #print ("Successfully loaded checkpoint from:", model_path)
 
             
         self.n_quantizers = 1
+
+
 
     def forward(self, x: torch.Tensor) :
         # We don't support training with this.
@@ -181,19 +183,21 @@ class Flow1dVAESeparate(AudioTokenizer):
     def __init__(
         self, 
         model_type: str = "model_2.safetensors",
-        vae_config: str = "",
-        vae_model: str = "",
+        vae_config:str = "",
+        vae_model:str = "",
         ):
         super().__init__()
 
         from .Flow1dVAE.generate_septoken import Tango
         model_path = model_type
-        self.model = Tango(model_path=model_path, vae_config=vae_config, vae_model=vae_model, device='cuda')
+        self.model = Tango(model_path=model_path, vae_config=vae_config, vae_model=vae_model,device='cuda')
         #print ("Successfully loaded checkpoint from:", model_path)
 
             
         self.n_quantizers = 1
 
+
+        
     def forward(self, x: torch.Tensor) :
         # We don't support training with this.
         raise NotImplementedError("Forward and training with DAC not supported.")

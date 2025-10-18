@@ -12,4 +12,5 @@ def get_model(model_config, path):
     state_dict = torch.load(path, map_location='cpu')
     model = create_autoencoder_from_config(model_config)
     model.load_state_dict(state_dict['state_dict'], strict=False)
+    del state_dict
     return model
