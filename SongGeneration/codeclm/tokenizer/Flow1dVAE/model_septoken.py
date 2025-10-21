@@ -273,10 +273,9 @@ class PromptCondAudioDiffusion(nn.Module):
         self.rvq_bestrq_emb = ResidualVectorQuantize(input_dim = 1024, n_codebooks = 1, codebook_size = 16_384, codebook_dim = 32, quantizer_dropout = 0.0, stale_tolerance=200)
         self.rvq_bestrq_bgm_emb = ResidualVectorQuantize(input_dim = 1024, n_codebooks = 1, codebook_size = 16_384, codebook_dim = 32, quantizer_dropout = 0.0, stale_tolerance=200)
 
-        hubert_path=os.path.join(folder_paths.models_dir,"SongGeneration/ckpt/models--lengyue233--content-vec-best/snapshots/c0b9ba13db21beaa4053faae94c102ebe326fd68") 
-        self.hubert = HubertModelWithFinalProj.from_pretrained(hubert_path)
-        #self.hubert = HubertModelWithFinalProj.from_pretrained("ckpt/models--lengyue233--content-vec-best/snapshots/c0b9ba13db21beaa4053faae94c102ebe326fd68")
-        for v in self.hubert.parameters():v.requires_grad = False
+        # self.hubert = HubertModelWithFinalProj.from_pretrained(os.path.join(folder_paths.models_dir,"SongGeneration/ckpt/models--lengyue233--content-vec-best/snapshots/c0b9ba13db21beaa4053faae94c102ebe326fd68") )
+        # for v in self.hubert.parameters():v.requires_grad = False
+
         self.zero_cond_embedding1 = nn.Parameter(torch.randn(32*32,))
         # self.xvecmodel = XVECModel()
         config = GPT2Config(n_positions=1000,n_layer=16,n_head=20,n_embd=2200,n_inner=4400)
