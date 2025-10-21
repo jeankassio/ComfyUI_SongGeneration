@@ -2,6 +2,7 @@
  [SongGeneration](https://github.com/tencent-ailab/SongGeneration):High-Quality Song Generation with Multi-Preference Alignment (SOTA),you can try VRAM>12G
 
 # Update
+* 10/21同步官方代码，精简模型加载，删除hubert模型，优化lm模型加载顺序，避免转移到显存时峰值OOM；  
 * 10/18  修改加载流程，支持最新的full ，new，large模型，large模型12GVram可能会OOM，修复高版本transformer 的函数错误/Modify the loading process to support the latest full, new, and large models, and fix function errors in higher versions of transformers   
 *  07/29，支持bgm和人声（vocal，目前还是有bgm底噪）单独输出，选择mixed为合成全部，模型加载方式更合理，去掉诸多debug打印，新增save_separate按钮，开启则保存三个音频（bgm，vocal，mixed）；
 * Test env（插件测试环境）：window11，python3.11， torch2.6 ，cu124， VR12G,（transformers 4.45.1）
