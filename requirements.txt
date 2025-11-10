@@ -72,7 +72,7 @@ einx
 # executing==2.2.0
 # expecttest==0.1.6
 #fairseq==0.12.2 #pip install fairseq -f https://download.pytorch.org/whl/cu124/torch_stable.html
-fairseq
+#fairseq
 # fastapi==0.110.3
 # ffmpy==0.3.2
 # filelock==3.13.1
