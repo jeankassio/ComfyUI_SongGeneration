@@ -77,7 +77,7 @@ class SongGeneration_Stage1:
     FUNCTION = "main"
     CATEGORY = "SongGeneration"
 
-    def main(self,vae,seperate_model, auto_prompt_audio_type,prompt_pt,model_1rvq,demucs_pt,**kwargs):
+    def main(self,vae,seperate_model,prompt_pt, auto_prompt_audio_type,model_1rvq,demucs_pt,**kwargs):
 
         audio=kwargs.get("audio", None)
         model_sep_path=folder_paths.get_full_path("SongGeneration", seperate_model) if seperate_model != "none" else None
@@ -85,7 +85,7 @@ class SongGeneration_Stage1:
         prompt_pt_path=folder_paths.get_full_path("SongGeneration", prompt_pt) if prompt_pt != "none" else None
     
         if audio is not None:
-            
+            print("Using audio as reference.")
             prompt_audio_path = os.path.join(folder_paths.get_input_directory(), f"audio_{time.strftime('%m%d%H%S')}_temp.wav")
             waveform=audio["waveform"].squeeze(0)
             buff = io.BytesIO()
